@@ -11,3 +11,4 @@ Extra utilities for [Bear.app](https://bear.app/).
 * `--tail n`, `--head n`, Show first or last `n` entries, in order
 * `-m`, Show all marked text for all notes
 * `-u`, Show all notes which are not referenced anywhere
+* `-s`, `--search`, Search notes using partial title
