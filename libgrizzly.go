@@ -14,6 +14,7 @@ type NoteTag struct {
 	Id    int
 	Title string
 	Tags  []string
+	Identifier string
 }
 
 type Note struct {
@@ -32,6 +33,13 @@ func openDB() *sql.DB {
 	}
 	return db
 }
+
+type NoteDuplicate struct {
+	Id    int
+	Title string
+	Count int
+}
+
 
 func GetAllNotes(notes *[]Note) {
 	db := openDB()
@@ -77,6 +85,7 @@ func GetAllWithTags(notes *[]NoteTag) {
 	rows, err := db.Query(`
 		select n.Z_PK as id,
        		n.ZTITLE as title,
+       		n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
 		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
         	left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
@@ -90,7 +99,7 @@ func GetAllWithTags(notes *[]NoteTag) {
 	for rows.Next() {
 		var row NoteTag
 		var tagStr string
-		err = rows.Scan(&row.Id, &row.Title, &tagStr)
+		err = rows.Scan(&row.Id, &row.Title, &row.Identifier, &tagStr)
 		row.Tags = strings.Split(tagStr, ",")
 		*notes = append(*notes, row)
 		if err != nil {
@@ -155,6 +164,7 @@ func GetTailWithTags(notes *[]NoteTag, limit int) {
 	rows, err := db.Query(`
 		select n.Z_PK as id,
        		n.ZTITLE as title,
+       		n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
 		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
         	left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
@@ -169,7 +179,7 @@ func GetTailWithTags(notes *[]NoteTag, limit int) {
 	for rows.Next() {
 		var row NoteTag
 		var tagStr sql.NullString
-		err = rows.Scan(&row.Id, &row.Title, &tagStr)
+		err = rows.Scan(&row.Id, &row.Title, &row.Identifier, &tagStr)
 		if tagStr.Valid {
 			row.Tags = strings.Split(tagStr.String, ",")
 		}
@@ -192,6 +202,7 @@ func GetHeadWithTags(notes *[]NoteTag, limit int) {
 	rows, err := db.Query(`
 		select n.Z_PK as id,
        		n.ZTITLE as title,
+       		n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
 		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
         	left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
@@ -206,7 +217,7 @@ func GetHeadWithTags(notes *[]NoteTag, limit int) {
 	for rows.Next() {
 		var row NoteTag
 		var tagStr sql.NullString
-		err = rows.Scan(&row.Id, &row.Title, &tagStr)
+		err = rows.Scan(&row.Id, &row.Title, &row.Identifier, &tagStr)
 		if tagStr.Valid {
 			row.Tags = strings.Split(tagStr.String, ",")
 		}
@@ -228,12 +239,6 @@ func homeDir() string {
 		log.Fatal(err)
 	}
 	return usr.HomeDir
-}
-
-type NoteDuplicate struct {
-	Id    int
-	Title string
-	Count int
 }
 
 func GetDuplicates(notes *[]NoteDuplicate) {
@@ -265,11 +270,11 @@ func GetDuplicates(notes *[]NoteDuplicate) {
 }
 
 func GetUnlinked() map[string][]string {
-	var all_notes []Note
-	GetAllNotes(&all_notes)
+	var allNotes []Note
+	GetAllNotes(&allNotes)
 	reference := make(map[string][]string)
 	r, _ := regexp.Compile("\\(bear:\\/\\/x-callback-url\\/open-note?(.*)\\)")
-	for _, note := range all_notes {
+	for _, note := range allNotes {
 		reference[note.Identifier] = make([]string, 0)
 		matches := r.FindAllString(note.Text, -1)
 		for _, mark := range matches {
@@ -278,4 +283,40 @@ func GetUnlinked() map[string][]string {
 		}
 	}
 	return reference
+}
+
+func SearchTitles(partialTitle string, notes *[]NoteTag) {
+	db := openDB()
+	defer db.Close()
+
+	rows, err := db.Query(`select n.Z_PK as id,
+       		n.ZTITLE as title,
+       		n.ZUNIQUEIDENTIFIER as identifier,
+       		group_concat(t.ZTITLE) as tags
+		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
+        	left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
+		where t.ZTITLE like ?
+		group by id;`, "%" + partialTitle + "%")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var row NoteTag
+		var tagStr sql.NullString
+		err = rows.Scan(&row.Id, &row.Title, &row.Identifier, &tagStr)
+		if tagStr.Valid {
+			row.Tags = strings.Split(tagStr.String, ",")
+		}
+		*notes = append(*notes, row)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

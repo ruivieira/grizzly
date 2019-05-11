@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ruivieira/color"
 	"os"
 	"regexp"
 	"strconv"
@@ -182,6 +183,21 @@ func cmdUnlinked(cmd *cli.Cmd) {
 	}
 }
 
+func cmdSearchTitle(cmd *cli.Cmd) {
+	cmd.Spec = "TITLE"
+	title := cmd.StringArg("TITLE", "", "Partial title")
+	cmd.Action = func() {
+		var notes []grizzly.NoteTag
+		grizzly.SearchTitles(*title, &notes)
+		bold := color.New(color.FgWhite, color.Bold)
+		italic := color.New(color.FgWhite, color.Italic)
+		for _, note := range notes {
+			_, _ = bold.Printf(note.Title)
+			_, _ = italic.Printf("\n🔗  bear://x-callback-url/open-note?id=%s\n┈┈\n", note.Identifier)
+		}
+	}
+}
+
 func main() {
 
 	// create an app
@@ -194,6 +210,7 @@ func main() {
 	app.Command("--tail", "Show oldest notes (by id)", cmdTail)
 	app.Command("--head", "Show newest notes (by id)", cmdHead)
 	app.Command("-u --unlinked", "Show unlinked notes", cmdUnlinked)
+	app.Command("-s --search", "Search notes by partial title", cmdSearchTitle)
 
 	app.Run(os.Args)
 }
