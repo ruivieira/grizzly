@@ -51,8 +51,8 @@ func GetAllNotes(notes *[]Note) {
 			n.ZTITLE as title,
 			n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
-		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
-        left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
+		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
+        left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		group by id;`)
 	if err != nil {
 		log.Fatal(err)
@@ -87,8 +87,8 @@ func GetAllWithTags(notes *[]NoteTag) {
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
-		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
-        	left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
+		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
+        	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		where t.ZTITLE is not null
 		group by id;`)
 	if err != nil {
@@ -123,8 +123,8 @@ func GetAllMarked(notes *[]Note) {
        		n.ZTITLE as title,
        		group_concat(t.ZTITLE) as tags,
        		n.ZUNIQUEIDENTIFIER as identifier
-		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
-        left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
+		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
+        left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
         where text like "%::%::%"
 		group by id;`)
 	if err != nil {
@@ -166,8 +166,8 @@ func GetTailWithTags(notes *[]NoteTag, limit int) {
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
-		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
-        	left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
+		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
+        	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		group by id
 		order by id asc
 		limit ?;`, limit)
@@ -204,8 +204,8 @@ func GetHeadWithTags(notes *[]NoteTag, limit int) {
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
-		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
-        	left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
+		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
+        	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		group by id
 		order by id desc
 		limit ?;`, limit)
@@ -293,8 +293,8 @@ func SearchTitles(partialTitle string, notes *[]NoteTag) {
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
-		from ZSFNOTE as n left join Z_6TAGS as tn on n.Z_PK=tn.Z_6NOTES
-        	left join ZSFNOTETAG as t on tn.Z_13TAGS=t.Z_PK
+		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
+        	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		where t.ZTITLE like ?
 		group by id;`, "%" + partialTitle + "%")
 	if err != nil {
