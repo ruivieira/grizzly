@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/jinzhu/gorm"
 	"github.com/ruivieira/color"
 	"os"
 	"regexp"
@@ -14,11 +15,13 @@ import (
 	"github.com/ruivieira/grizzly"
 )
 
+var db *gorm.DB
+
 func cmdDuplicate(cmd *cli.Cmd) {
 	cmd.Action = func() {
 
 		var notes []grizzly.NoteDuplicate
-		grizzly.GetDuplicates(&notes)
+		grizzly.GetDuplicates(db, &notes)
 
 		total := 0
 		for _, note := range notes {
@@ -47,7 +50,7 @@ func cmdNaiveBayes(cmd *cli.Cmd) {
 	title := cmd.StringArg("TITLE", "", "Title to auto-suggest")
 	cmd.Action = func() {
 		var notes []grizzly.NoteTag
-		grizzly.GetAllWithTags(&notes)
+		grizzly.GetAllWithTags(db, &notes)
 
 		// unique tags
 		set := make(map[string]bool)
@@ -98,7 +101,7 @@ func cmdTail(cmd *cli.Cmd) {
 	cmd.Action = func() {
 
 		var notes []grizzly.NoteTag
-		grizzly.GetTailWithTags(&notes, *number)
+		grizzly.GetTailWithTags(db, &notes, *number)
 
 		table := tablewriter.NewWriter(os.Stdout)
 		table.SetHeader([]string{"id", "title", "tags"})
@@ -119,7 +122,7 @@ func cmdHead(cmd *cli.Cmd) {
 	cmd.Action = func() {
 
 		var notes []grizzly.NoteTag
-		grizzly.GetHeadWithTags(&notes, *number)
+		grizzly.GetHeadWithTags(db, &notes, *number)
 
 		table := tablewriter.NewWriter(os.Stdout)
 		table.SetHeader([]string{"id", "title", "tags"})
@@ -138,7 +141,7 @@ func cmdMarkedAll(cmd *cli.Cmd) {
 	cmd.Action = func() {
 
 		var notes []grizzly.Note
-		grizzly.GetAllMarked(&notes)
+		grizzly.GetAllMarked(db, &notes)
 
 		r, _ := regexp.Compile("::(.*)::")
 		cb, _ := regexp.Compile("```[a-z]*\\n[\\s\\S]*?\\n```")
@@ -174,7 +177,7 @@ func cmdMarkedAll(cmd *cli.Cmd) {
 func cmdUnlinked(cmd *cli.Cmd) {
 
 	cmd.Action = func() {
-		reference := grizzly.GetUnlinked()
+		reference := grizzly.GetUnlinked(db)
 		for k, v := range reference {
 			if len(v) == 0 {
 				fmt.Printf("bear://x-callback-url/open-note?id=%s\n", k)
@@ -188,7 +191,7 @@ func cmdSearchTitle(cmd *cli.Cmd) {
 	title := cmd.StringArg("TITLE", "", "Partial title")
 	cmd.Action = func() {
 		var notes []grizzly.NoteTag
-		grizzly.SearchTitles(*title, &notes)
+		grizzly.SearchTitles(db, *title, &notes)
 		bold := color.New(color.FgWhite, color.Bold)
 		italic := color.New(color.FgWhite, color.Italic)
 		for _, note := range notes {
@@ -199,6 +202,9 @@ func cmdSearchTitle(cmd *cli.Cmd) {
 }
 
 func main() {
+
+	db = grizzly.OpenDB()
+	defer db.Close()
 
 	// create an app
 	app := cli.App("grizzly", "Bear.app extra utilities")
