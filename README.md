@@ -4,7 +4,21 @@
 
 Extra utilities for [Bear.app](https://bear.app/).
 
-## features
+## Library
+
+To use `grizzly` as a library, just do `go get github.com/ruivieira/grizzly` or add it
+to your `go.mod`.
+
+## CLI
+
+To use the CLI, just do
+
+```shell
+$ cd grizlly
+$ go build
+```
+
+### CLI commands
 
 * `-d`, Show duplicate titles and counts
 * `-ts`, Suggest tag for given title (based on your data)
