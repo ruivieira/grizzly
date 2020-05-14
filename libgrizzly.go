@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
 type NoteTag struct {
@@ -25,9 +27,9 @@ type Note struct {
 	Identifier string
 }
 
-func openDB() *sql.DB {
+func OpenDB() *gorm.DB {
 	homeDirStr := homeDir() + "/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite"
-	db, err := sql.Open("sqlite3", homeDirStr)
+	db, err := gorm.Open("sqlite3", homeDirStr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,11 +43,8 @@ type NoteDuplicate struct {
 }
 
 
-func GetAllNotes(notes *[]Note) {
-	db := openDB()
-	defer db.Close()
-
-	rows, err := db.Query(`
+func GetAllNotes(db *gorm.DB, notes *[]Note) {
+	rows, err := db.Raw(`
 		select n.Z_PK as id,
        		n.ZTEXT as text,
 			n.ZTITLE as title,
@@ -53,36 +52,31 @@ func GetAllNotes(notes *[]Note) {
        		group_concat(t.ZTITLE) as tags
 		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
         left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
-		group by id;`)
-	if err != nil {
-		log.Fatal(err)
-	}
+		group by id;`).Rows()
 	defer rows.Close()
-
+	if err != nil {
+		log.Fatal("Could not process query")
+	}
 	for rows.Next() {
-		var row Note
+		var note Note
+		var text sql.NullString
 		var tagStr sql.NullString
-		err = rows.Scan(&row.Id, &row.Text, &row.Title, &row.Identifier, &tagStr)
-		if tagStr.Valid {
-			row.Tags = strings.Split(tagStr.String, ",")
+		err = rows.Scan(&note.Id, &text, &note.Title, &note.Identifier, &tagStr)
+		if text.Valid {
+			note.Text = text.String
 		}
-		*notes = append(*notes, row)
+		if tagStr.Valid {
+			note.Tags = strings.Split(tagStr.String, ",")
+		}
+		*notes = append(*notes, note)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
-func GetAllWithTags(notes *[]NoteTag) {
-	db := openDB()
-	defer db.Close()
-
-	rows, err := db.Query(`
+func GetAllWithTags(db *gorm.DB, notes *[]NoteTag) {
+	rows, err := db.Raw(`
 		select n.Z_PK as id,
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
@@ -90,34 +84,27 @@ func GetAllWithTags(notes *[]NoteTag) {
 		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
         	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		where t.ZTITLE is not null
-		group by id;`)
-	if err != nil {
-		log.Fatal(err)
-	}
+		group by id;`).Rows()
 	defer rows.Close()
-
+	if err != nil {
+		log.Fatal("Could not process query")
+	}
 	for rows.Next() {
-		var row NoteTag
-		var tagStr string
-		err = rows.Scan(&row.Id, &row.Title, &row.Identifier, &tagStr)
-		row.Tags = strings.Split(tagStr, ",")
-		*notes = append(*notes, row)
+		var note NoteTag
+		var tagStr sql.NullString
+		err = rows.Scan(&note.Id, &note.Title, &note.Identifier, &tagStr)
+		if tagStr.Valid {
+			note.Tags = strings.Split(tagStr.String, ",")
+		}
+		*notes = append(*notes, note)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
-func GetAllMarked(notes *[]Note) {
-	db := openDB()
-	defer db.Close()
-
-	rows, err := db.Query(`
+func GetAllMarked(db *gorm.DB, notes *[]Note) {
+	db.Raw(`
 		select n.Z_PK as id,
        		n.ZTEXT as text,
        		n.ZTITLE as title,
@@ -126,42 +113,11 @@ func GetAllMarked(notes *[]Note) {
 		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
         left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
         where text like "%::%::%"
-		group by id;`)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var row Note
-		var text sql.NullString
-		var tagStr sql.NullString
-		err = rows.Scan(&row.Id, &text, &row.Title, &tagStr, &row.Identifier)
-		if text.Valid {
-			row.Text = text.String
-		} else {
-			row.Text = ""
-		}
-		if tagStr.Valid {
-			row.Tags = strings.Split(tagStr.String, ",")
-		}
-		*notes = append(*notes, row)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
-	}
+		group by id;`).Scan(notes)
 }
 
-func GetTailWithTags(notes *[]NoteTag, limit int) {
-	db := openDB()
-	defer db.Close()
-
-	rows, err := db.Query(`
+func GetTailWithTags(db *gorm.DB, notes *[]NoteTag, limit int) {
+	rows, err := db.Raw(`
 		select n.Z_PK as id,
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
@@ -170,36 +126,27 @@ func GetTailWithTags(notes *[]NoteTag, limit int) {
         	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		group by id
 		order by id asc
-		limit ?;`, limit)
-	if err != nil {
-		log.Fatal(err)
-	}
+		limit ?;`, limit).Rows()
 	defer rows.Close()
-
+	if err != nil {
+		log.Fatal("Could not process query")
+	}
 	for rows.Next() {
-		var row NoteTag
+		var note NoteTag
 		var tagStr sql.NullString
-		err = rows.Scan(&row.Id, &row.Title, &row.Identifier, &tagStr)
+		err = rows.Scan(&note.Id, &note.Title, &note.Identifier, &tagStr)
 		if tagStr.Valid {
-			row.Tags = strings.Split(tagStr.String, ",")
+			note.Tags = strings.Split(tagStr.String, ",")
 		}
-		*notes = append(*notes, row)
+		*notes = append(*notes, note)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
-func GetHeadWithTags(notes *[]NoteTag, limit int) {
-	db := openDB()
-	defer db.Close()
-
-	rows, err := db.Query(`
+func GetHeadWithTags(db *gorm.DB, notes *[]NoteTag, limit int) {
+	rows, err := db.Raw(`
 		select n.Z_PK as id,
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
@@ -208,28 +155,22 @@ func GetHeadWithTags(notes *[]NoteTag, limit int) {
         	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		group by id
 		order by id desc
-		limit ?;`, limit)
-	if err != nil {
-		log.Fatal(err)
-	}
+		limit ?;`, limit).Rows()
 	defer rows.Close()
-
+	if err != nil {
+		log.Fatal("Could not process query")
+	}
 	for rows.Next() {
-		var row NoteTag
+		var note NoteTag
 		var tagStr sql.NullString
-		err = rows.Scan(&row.Id, &row.Title, &row.Identifier, &tagStr)
+		err = rows.Scan(&note.Id, &note.Title, &note.Identifier, &tagStr)
 		if tagStr.Valid {
-			row.Tags = strings.Split(tagStr.String, ",")
+			note.Tags = strings.Split(tagStr.String, ",")
 		}
-		*notes = append(*notes, row)
+		*notes = append(*notes, note)
 		if err != nil {
 			log.Fatal(err)
 		}
-	}
-
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
 	}
 }
 
@@ -241,37 +182,17 @@ func homeDir() string {
 	return usr.HomeDir
 }
 
-func GetDuplicates(notes *[]NoteDuplicate) {
-	db := openDB()
-	defer db.Close()
-
-	rows, err := db.Query(`
+func GetDuplicates(db *gorm.DB, notes *[]NoteDuplicate) {
+	db.Raw(`
 			select Z_PK as id, ZTITLE as title, count(ZTITLE) as count
 			from ZSFNOTE 
 			group by ZTITLE having ( count > 1 );
-		`)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var row NoteDuplicate
-		err = rows.Scan(&row.Id, &row.Title, &row.Count)
-		*notes = append(*notes, row)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
-	}
+		`).Scan(notes)
 }
 
-func GetUnlinked() map[string][]string {
+func GetUnlinked(db *gorm.DB) map[string][]string {
 	var allNotes []Note
-	GetAllNotes(&allNotes)
+	GetAllNotes(db, &allNotes)
 	reference := make(map[string][]string)
 	r, _ := regexp.Compile("\\(bear:\\/\\/x-callback-url\\/open-note?(.*)\\)")
 	for _, note := range allNotes {
@@ -285,18 +206,15 @@ func GetUnlinked() map[string][]string {
 	return reference
 }
 
-func SearchTitles(partialTitle string, notes *[]NoteTag) {
-	db := openDB()
-	defer db.Close()
-
-	rows, err := db.Query(`select n.Z_PK as id,
+func SearchTitles(db *gorm.DB, partialTitle string, notes *[]NoteTag) {
+	rows, err := db.Raw(`select n.Z_PK as id,
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
        		group_concat(t.ZTITLE) as tags
 		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
         	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		where t.ZTITLE like ?
-		group by id;`, "%" + partialTitle + "%")
+		group by id;`, "%" + partialTitle + "%").Rows()
 	if err != nil {
 		log.Fatal(err)
 	}
