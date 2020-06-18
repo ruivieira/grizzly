@@ -207,12 +207,17 @@ func GetUnlinked(db *gorm.DB, unlinked *[]string) {
 	GetAllNotes(db, &allNotes)
 	reference := make(map[string][]string)
 	r, _ := regexp.Compile("\\(bear:\\/\\/x-callback-url\\/open-note?(.*)\\)")
+	idr, _ := regexp.Compile("bear:\\/\\/x-callback-url\\/open-note\\?id=([^&)]*)?")
 	for _, note := range allNotes {
 		reference[note.Identifier] = make([]string, 0)
 		matches := r.FindAllString(note.Text, -1)
 		for _, mark := range matches {
-			identifier := mark[36 : len(mark)-1]
-			reference[identifier] = append(reference[identifier], note.Identifier)
+
+			idMatches := idr.FindStringSubmatch(mark)
+			if len(idMatches) >= 2 {
+				reference[idMatches[1]] = append(reference[idMatches[1]], note.Identifier)
+			}
+
 		}
 	}
 	// filter out entries with no backlinks
