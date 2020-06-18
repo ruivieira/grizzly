@@ -2,21 +2,24 @@ package grizzly
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os/user"
 	"regexp"
 	"strings"
+	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type NoteTag struct {
-	Id    int
-	Title string
-	Tags  []string
-	Identifier string
+	Id           int
+	Title        string
+	Tags         []string
+	Identifier   string
+	CreationDate time.Time `gorm:"type:timestamp"`
 }
 
 type Note struct {
@@ -41,7 +44,6 @@ type NoteDuplicate struct {
 	Title string
 	Count int
 }
-
 
 func GetAllNotes(db *gorm.DB, notes *[]Note) {
 	rows, err := db.Raw(`
@@ -80,7 +82,8 @@ func GetAllWithTags(db *gorm.DB, notes *[]NoteTag) {
 		select n.Z_PK as id,
        		n.ZTITLE as title,
        		n.ZUNIQUEIDENTIFIER as identifier,
-       		group_concat(t.ZTITLE) as tags
+       		group_concat(t.ZTITLE) as tags,
+			n.ZCREATIONDATE
 		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
         	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		where t.ZTITLE is not null
@@ -92,9 +95,18 @@ func GetAllWithTags(db *gorm.DB, notes *[]NoteTag) {
 	for rows.Next() {
 		var note NoteTag
 		var tagStr sql.NullString
-		err = rows.Scan(&note.Id, &note.Title, &note.Identifier, &tagStr)
+		var creationDate sql.NullFloat64
+		err = rows.Scan(&note.Id, &note.Title, &note.Identifier, &tagStr, &creationDate)
 		if tagStr.Valid {
 			note.Tags = strings.Split(tagStr.String, ",")
+		}
+		if creationDate.Valid {
+			//note.CreationDate = creationDate.Time
+			//fmt.Println(creationDate.Time)
+			seconds, _ := time.ParseDuration(fmt.Sprintf("%fs", creationDate.Float64))
+			start := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+			fmt.Printf("start: %s, seconds: %d, now: %s\n", start, seconds, start.Add(seconds))
+			note.CreationDate = start.Add(seconds)
 		}
 		*notes = append(*notes, note)
 		if err != nil {
@@ -190,7 +202,7 @@ func GetDuplicates(db *gorm.DB, notes *[]NoteDuplicate) {
 		`).Scan(notes)
 }
 
-func GetUnlinked(db *gorm.DB) map[string][]string {
+func GetUnlinked(db *gorm.DB, unlinked *[]string) {
 	var allNotes []Note
 	GetAllNotes(db, &allNotes)
 	reference := make(map[string][]string)
@@ -203,7 +215,12 @@ func GetUnlinked(db *gorm.DB) map[string][]string {
 			reference[identifier] = append(reference[identifier], note.Identifier)
 		}
 	}
-	return reference
+	// filter out entries with no backlinks
+	for note, backlinks := range reference {
+		if len(backlinks) == 0 {
+			*unlinked = append(*unlinked, note)
+		}
+	}
 }
 
 func SearchTitles(db *gorm.DB, partialTitle string, notes *[]NoteTag) {
@@ -214,7 +231,7 @@ func SearchTitles(db *gorm.DB, partialTitle string, notes *[]NoteTag) {
 		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
         	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
 		where t.ZTITLE like ?
-		group by id;`, "%" + partialTitle + "%").Rows()
+		group by id;`, "%"+partialTitle+"%").Rows()
 	if err != nil {
 		log.Fatal(err)
 	}

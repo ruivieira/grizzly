@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/jinzhu/gorm"
-	"github.com/ruivieira/color"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/jawher/mow.cli"
+	"github.com/jinzhu/gorm"
+	"github.com/ruivieira/color"
+
+	cli "github.com/jawher/mow.cli"
 	"github.com/jbrukh/bayesian"
 	"github.com/olekukonko/tablewriter"
 	"github.com/ruivieira/grizzly"
@@ -177,11 +178,10 @@ func cmdMarkedAll(cmd *cli.Cmd) {
 func cmdUnlinked(cmd *cli.Cmd) {
 
 	cmd.Action = func() {
-		reference := grizzly.GetUnlinked(db)
-		for k, v := range reference {
-			if len(v) == 0 {
-				fmt.Printf("bear://x-callback-url/open-note?id=%s\n", k)
-			}
+		var unlinked []string
+		grizzly.GetUnlinked(db, &unlinked)
+		for _, note := range unlinked {
+			fmt.Printf("bear://x-callback-url/open-note?id=%s\n", note)
 		}
 	}
 }
