@@ -235,7 +235,7 @@ func SearchTitles(db *gorm.DB, partialTitle string, notes *[]NoteTag) {
        		group_concat(t.ZTITLE) as tags
 		from ZSFNOTE as n left join Z_7TAGS as tn on n.Z_PK=tn.Z_7NOTES
         	left join ZSFNOTETAG as t on tn.Z_14TAGS=t.Z_PK
-		where t.ZTITLE like ?
+		where n.ZTITLE like ?
 		group by id;`, "%"+partialTitle+"%").Rows()
 	if err != nil {
 		log.Fatal(err)
