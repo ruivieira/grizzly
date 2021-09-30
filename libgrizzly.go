@@ -202,22 +202,39 @@ func GetDuplicates(db *gorm.DB, notes *[]NoteDuplicate) {
 		`).Scan(notes)
 }
 
+var (
+	idr = regexp.MustCompile("\\(bear:\\/\\/x-callback-url\\/open-note\\?id=([^&)]*)?\\)")
+	ttr = regexp.MustCompile("\\[\\[([^\\[\\]]+)\\]\\]")
+)
+
 func GetUnlinked(db *gorm.DB, unlinked *[]string) {
 	var allNotes []Note
 	GetAllNotes(db, &allNotes)
+	titleIdentifier := make(map[string]string)
 	reference := make(map[string][]string)
-	r, _ := regexp.Compile("\\(bear:\\/\\/x-callback-url\\/open-note?(.*)\\)")
-	idr, _ := regexp.Compile("bear:\\/\\/x-callback-url\\/open-note\\?id=([^&)]*)?")
+	for _, n := range allNotes {
+		titleIdentifier[n.Title] = n.Identifier
+	}
 	for _, note := range allNotes {
-		reference[note.Identifier] = make([]string, 0)
-		matches := r.FindAllString(note.Text, -1)
-		for _, mark := range matches {
-
-			idMatches := idr.FindStringSubmatch(mark)
-			if len(idMatches) >= 2 {
-				reference[idMatches[1]] = append(reference[idMatches[1]], note.Identifier)
+		if _, ok := reference[note.Identifier]; !ok {
+			reference[note.Identifier] = make([]string, 0)
+		}
+		idMatches := idr.FindAllStringSubmatch(note.Text, -1)
+		for _, idMatch := range idMatches {
+			identifier := idMatch[1]
+			reference[identifier] = append(reference[identifier], note.Identifier)
+		}
+		ttrMatches := ttr.FindAllStringSubmatch(note.Text, -1)
+		for _, ttrMatch := range ttrMatches {
+			title := strings.Replace(ttrMatch[1], `\/`, "/", -1)
+			if identifier, ok := titleIdentifier[title]; !ok {
+				fmt.Printf(
+					"Warn: in '%s', wiki link '%s' does not exist\n",
+					note.Title, title,
+				)
+			} else {
+				reference[identifier] = append(reference[identifier], note.Identifier)
 			}
-
 		}
 	}
 	// filter out entries with no backlinks
