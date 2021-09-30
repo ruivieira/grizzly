@@ -226,7 +226,7 @@ func GetUnlinked(db *gorm.DB, unlinked *[]string) {
 		}
 		ttrMatches := ttr.FindAllStringSubmatch(note.Text, -1)
 		for _, ttrMatch := range ttrMatches {
-			title := ttrMatch[1]
+			title := strings.Replace(ttrMatch[1], `\/`, "/", -1)
 			if identifier, ok := titleIdentifier[title]; !ok {
 				fmt.Printf(
 					"Warn: in '%s', wiki link '%s' does not exist\n",
